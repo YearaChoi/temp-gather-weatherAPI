@@ -60,14 +60,15 @@ function formatDateTime(yyyymmddhhmi) {
 
 // CSV 생성 함수
 function generateCSV(data, location) {
-  let csv = 'id,temperature,recorded_at,location\n';
+  let csv = 'id,temperature,humidity,recorded_at,location\n';
   
   data.forEach((row, index) => {
     const id = index + 1;
     const temperature = row.ta === '-9.0' || row.ta === '-9' ? '' : row.ta;
+    const humidity = row.hm === '-9.0' || row.hm === '-9' ? '' : row.hm;
     const recordedAt = formatDateTime(row.datetime);
     
-    csv += `${id},${temperature},${recordedAt},${location}\n`;
+    csv += `${id},${temperature},${humidity},${recordedAt},${location}\n`;
   });
   
   return csv;
