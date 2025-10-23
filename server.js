@@ -58,6 +58,92 @@ function formatDateTime(yyyymmddhhmi) {
   return `${year}-${month}-${day} ${hour}:${minute}:00`;
 }
 
+// 15분 단위로 데이터 보간 함수
+function interpolateData(data) {
+  if (data.length === 0) return [];
+  
+  const interpolatedData = [];
+  
+  for (let i = 0; i < data.length; i++) {
+    const current = data[i];
+    const next = data[i + 1];
+    
+    // 현재 데이터 추가
+    interpolatedData.push({...current});
+    
+    // 다음 데이터가 있으면 보간
+    if (next) {
+      const currentTime = parseDateTime(current.datetime);
+      const nextTime = parseDateTime(next.datetime);
+      const timeDiff = nextTime - currentTime; // 밀리초 단위
+      
+      // 15분 간격으로 보간 (1시간 = 4개의 15분 구간)
+      const intervals = Math.floor(timeDiff / (15 * 60 * 1000)); // 15분 단위 개수
+      
+      if (intervals > 1) {
+        const currentTemp = parseFloat(current.ta);
+        const nextTemp = parseFloat(next.ta);
+        const currentHumidity = current.hm;
+        
+        // 온도와 습도가 유효한 경우에만 보간
+        const validTemp = !isNaN(currentTemp) && !isNaN(nextTemp) && 
+                          current.ta !== '-9.0' && current.ta !== '-9' &&
+                          next.ta !== '-9.0' && next.ta !== '-9';
+        
+        for (let j = 1; j < intervals; j++) {
+          const newTime = new Date(currentTime.getTime() + j * 15 * 60 * 1000);
+          const newDateTime = formatDateTimeToAPI(newTime);
+          
+          // 온도는 선형 보간
+          let interpolatedTemp = current.ta;
+          if (validTemp) {
+            const ratio = j / intervals;
+            interpolatedTemp = (currentTemp + (nextTemp - currentTemp) * ratio).toFixed(1);
+          }
+          
+          // 습도는 이전 값 유지
+          const interpolatedHumidity = currentHumidity;
+          
+          interpolatedData.push({
+            datetime: newDateTime,
+            stn: current.stn,
+            wd: current.wd,
+            ws: current.ws,
+            pa: current.pa,
+            ta: interpolatedTemp,
+            td: current.td,
+            hm: interpolatedHumidity
+          });
+        }
+      }
+    }
+  }
+  
+  return interpolatedData;
+}
+
+// 날짜 문자열을 Date 객체로 변환 (YYYYMMDDHHmm)
+function parseDateTime(yyyymmddhhmi) {
+  const year = parseInt(yyyymmddhhmi.substring(0, 4));
+  const month = parseInt(yyyymmddhhmi.substring(4, 6)) - 1; // 월은 0부터 시작
+  const day = parseInt(yyyymmddhhmi.substring(6, 8));
+  const hour = parseInt(yyyymmddhhmi.substring(8, 10));
+  const minute = parseInt(yyyymmddhhmi.substring(10, 12));
+  
+  return new Date(year, month, day, hour, minute);
+}
+
+// Date 객체를 API 형식 문자열로 변환 (YYYYMMDDHHmm)
+function formatDateTimeToAPI(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  
+  return `${year}${month}${day}${hour}${minute}`;
+}
+
 // CSV 생성 함수
 function generateCSV(data, location) {
   let csv = 'id,temperature,humidity,recorded_at,location\n';
@@ -275,12 +361,18 @@ app.post('/api/fetch-weather', async (req, res) => {
       });
     }
     
+    // 15분 단위로 데이터 보간
+    console.log('15분 단위 보간 시작...');
+    const interpolatedData = interpolateData(parsedData);
+    console.log('보간 후 데이터 개수:', interpolatedData.length);
+    console.log('--------------------------------------------');
+    
     // CSV 생성
-    const csv = generateCSV(parsedData, '서울시');
+    const csv = generateCSV(interpolatedData, '서울시');
     
     res.json({
       success: true,
-      dataCount: parsedData.length,
+      dataCount: interpolatedData.length,
       csv: csv
     });
     
