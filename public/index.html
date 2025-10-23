@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기상청 온도 데이터 다운로드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="date"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input[type="date"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .message.active {
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .location-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .debug-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px dashed #e0e0e0;
+        }
+
+        .debug-section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            box-shadow: 0 10px 20px rgba(245, 87, 108, 0.3);
+        }
+
+        .test-result {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .test-result.active {
+            display: block;
+        }
+
+        .test-result pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-group button {
+            flex: 1;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌡️ 기상청 온도 데이터 다운로드</h1>
+        <p class="subtitle">서울시 금천구 지역의 기온 데이터를 다운로드합니다</p>
+        
+        <div class="info-box">
+            <strong>📌 사용 안내</strong>
+            <ul>
+                <li>최대 3주치 데이터를 다운로드할 수 있습니다</li>
+                <li>데이터는 15분 간격으로 제공됩니다</li>
+                <li>날짜 선택시 해당 날짜의 전체 시간(00:00~24:00)을 조회합니다</li>
+                <li>CSV 형식으로 다운로드됩니다</li>
+            </ul>
+        </div>
+
+        <form id="weatherForm">
+            <div class="form-group">
+                <label for="startDate">시작 날짜 *</label>
+                <input type="date" id="startDate" required>
+                <p class="help-text">데이터 조회를 시작할 날짜 (00:00부터)</p>
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">종료 날짜 *</label>
+                <input type="date" id="endDate" required>
+                <p class="help-text">데이터 조회를 종료할 날짜 (24:00 자정까지)</p>
+            </div>
+
+            <div class="form-group">
+                <label>데이터 수집 위치</label>
+                <span class="location-badge">📍 서울시 금천구</span>
+            </div>
+
+            <button type="submit" id="submitBtn">
+                📥 데이터 다운로드
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>데이터를 가져오는 중입니다...</p>
+        </div>
+
+        <div class="message" id="message"></div>
+
+        <!-- 디버그 섹션 -->
+        <div class="debug-section">
+            <h2>🔧 지점 테스트 도구</h2>
+            <p class="help-text">다른 기상 관측 지점을 테스트해볼 수 있습니다</p>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label for="testStationNumber">테스트할 지점번호</label>
+                <input type="text" id="testStationNumber" placeholder="예: 108, 417" value="417">
+                <p class="help-text">지점번호를 입력하고 테스트 버튼을 클릭하세요</p>
+            </div>
+
+            <div class="btn-group">
+                <button type="button" id="testStationBtn" class="btn-secondary">
+                    🔍 지점 테스트
+                </button>
+                <button type="button" id="fetchStationsBtn" class="btn-secondary">
+                    📋 지점 목록 조회
+                </button>
+            </div>
+
+            <div class="test-result" id="testResult"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
