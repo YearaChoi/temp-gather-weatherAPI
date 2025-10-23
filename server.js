@@ -368,7 +368,7 @@ app.post('/api/fetch-weather', async (req, res) => {
     console.log('--------------------------------------------');
     
     // CSV 생성
-    const csv = generateCSV(interpolatedData, '서울시');
+    const csv = generateCSV(interpolatedData, '서울시 종로구');
     
     res.json({
       success: true,
