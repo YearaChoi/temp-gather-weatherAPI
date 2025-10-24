@@ -3,16 +3,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitBtn = document.getElementById('submitBtn');
     const loading = document.getElementById('loading');
     const message = document.getElementById('message');
-    const startDateInput = document.getElementById('startDate');
-    const endDateInput = document.getElementById('endDate');
+    const targetDateInput = document.getElementById('targetDate');
 
-    // 기본값 설정 (어제와 오늘)
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    
-    endDateInput.value = formatDateLocal(today);
-    startDateInput.value = formatDateLocal(yesterday);
+    // 기본값 설정 (어제)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    targetDateInput.value = formatDateLocal(yesterday);
 
     // date input용 포맷 (YYYY-MM-DD)
     function formatDateLocal(date) {
@@ -24,23 +20,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // API용 포맷 (YYYYMMDDHHmm)
-    // 시작 날짜는 00:00, 종료 날짜는 24:00(다음날 00:00)로 설정
+    // 시작 날짜는 00:00, 종료 날짜는 다음날 00:00 (24:00)
     function formatForAPI(dateString, isEnd = false) {
-        const date = new Date(dateString);
+        // dateString은 YYYY-MM-DD 형식
+        const [year, month, day] = dateString.split('-');
         
         if (isEnd) {
             // 종료 날짜는 다음날 00:00 (24:00)
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
             date.setDate(date.getDate() + 1);
+            
+            const endYear = date.getFullYear();
+            const endMonth = String(date.getMonth() + 1).padStart(2, '0');
+            const endDay = String(date.getDate()).padStart(2, '0');
+            
+            return `${endYear}${endMonth}${endDay}0000`;
+        } else {
+            // 시작 날짜는 해당 날짜 00:00
+            return `${year}${month}${day}0000`;
         }
-        
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        
-        // 시작 날짜는 0000 (00:00), 종료 날짜도 0000 (다음날 00:00 = 24:00)
-        const time = '0000';
-        
-        return `${year}${month}${day}${time}`;
     }
 
     // 메시지 표시 함수
@@ -76,27 +74,10 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         // 입력값 검증
-        const startDate = startDateInput.value;
-        const endDate = endDateInput.value;
+        const targetDate = targetDateInput.value;
 
-        if (!startDate || !endDate) {
-            showMessage('시작 날짜와 종료 날짜를 모두 입력해주세요.', 'error');
-            return;
-        }
-
-        // 날짜 검증
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        if (start > end) {
-            showMessage('시작 날짜는 종료 날짜보다 이전이어야 합니다.', 'error');
-            return;
-        }
-
-        // 3주(21일) 제한 검증
-        const diffDays = (end - start) / (1000 * 60 * 60 * 24);
-        if (diffDays > 21) {
-            showMessage('최대 3주(21일)치 데이터만 조회할 수 있습니다.', 'error');
+        if (!targetDate) {
+            showMessage('날짜를 선택해주세요.', 'error');
             return;
         }
 
@@ -106,6 +87,19 @@ document.addEventListener('DOMContentLoaded', function() {
         hideMessage();
 
         try {
+            // API 파라미터 생성 (선택한 날짜의 00:00 ~ 다음날 00:00)
+            const apiStartDate = formatForAPI(targetDate, false); // 00:00
+            const apiEndDate = formatForAPI(targetDate, true);    // 다음날 00:00
+            
+            // 디버깅: 전송되는 값 확인
+            console.log('============================================');
+            console.log('📤 API 요청 파라미터:');
+            console.log('============================================');
+            console.log('선택한 날짜:', targetDate);
+            console.log('전송할 시작 날짜 (tm1):', apiStartDate);
+            console.log('전송할 종료 날짜 (tm2):', apiEndDate);
+            console.log('============================================');
+            
             // API 호출
             const response = await fetch('/api/fetch-weather', {
                 method: 'POST',
@@ -113,8 +107,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    startDate: formatForAPI(startDate, false), // 시작: 00:00
-                    endDate: formatForAPI(endDate, true)       // 종료: 24:00 (다음날 00:00)
+                    startDate: apiStartDate,
+                    endDate: apiEndDate
                 })
             });
 
@@ -132,23 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('원본 데이터 미리보기:');
                     console.log(data.debug.rawDataPreview);
                     console.log('============================================');
-                    console.log('💡 해결 방법:');
-                    console.log('1. 서버 터미널에서 더 자세한 로그를 확인하세요');
-                    console.log('2. 지점번호 417이 유효한지 확인하세요');
-                    console.log('3. 다른 날짜 범위로 시도해보세요');
-                    console.log('4. 지점번호 108(서울 대표)로 테스트해보세요');
-                    console.log('============================================');
                 }
                 throw new Error(data.error || '데이터를 가져오는데 실패했습니다.');
             }
 
             if (data.success && data.csv) {
                 // CSV 파일 다운로드
-                const filename = `weather_data_${startDate}_${endDate}.csv`;
+                const filename = `weather_data_${targetDate}.csv`;
                 downloadCSV(data.csv, filename);
                 
                 showMessage(
-                    `✅ 성공! ${data.dataCount}개의 데이터를 다운로드했습니다.`,
+                    `✅ 성공! ${targetDate}의 ${data.dataCount}개 데이터를 다운로드했습니다.`,
                     'success'
                 );
             } else {
@@ -158,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error:', error);
             showMessage(
-                `❌ 오류: ${error.message} (자세한 내용은 브라우저 콘솔을 확인하세요)`,
+                `❌ 오류: ${error.message}`,
                 'error'
             );
         } finally {
@@ -167,26 +155,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loading.classList.remove('active');
         }
     });
-
-    // 날짜 입력 변경시 유효성 검사
-    startDateInput.addEventListener('change', validateDates);
-    endDateInput.addEventListener('change', validateDates);
-
-    function validateDates() {
-        const start = new Date(startDateInput.value);
-        const end = new Date(endDateInput.value);
-
-        if (start && end && start > end) {
-            showMessage('시작 날짜는 종료 날짜보다 이전이어야 합니다.', 'error');
-        } else if (start && end) {
-            const diffDays = (end - start) / (1000 * 60 * 60 * 24);
-            if (diffDays > 21) {
-                showMessage('최대 3주(21일)치 데이터만 조회할 수 있습니다.', 'error');
-            } else {
-                hideMessage();
-            }
-        }
-    }
 
     // 지점 테스트 기능
     const testStationBtn = document.getElementById('testStationBtn');
@@ -208,6 +176,8 @@ document.addEventListener('DOMContentLoaded', function() {
         testResult.classList.add('active');
 
         try {
+            const targetDate = targetDateInput.value || formatDateLocal(new Date());
+            
             const response = await fetch('/api/test-station', {
                 method: 'POST',
                 headers: {
@@ -215,8 +185,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify({
                     stationNumber: stationNumber,
-                    startDate: formatForAPI(startDateInput.value, false),
-                    endDate: formatForAPI(endDateInput.value, true)
+                    startDate: formatForAPI(targetDate, false),
+                    endDate: formatForAPI(targetDate, true)
                 })
             });
 
