@@ -92,13 +92,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const apiEndDate = formatForAPI(targetDate, true);    // 다음날 00:00
             
             // 디버깅: 전송되는 값 확인
-            console.log('============================================');
-            console.log('📤 API 요청 파라미터:');
-            console.log('============================================');
-            console.log('선택한 날짜:', targetDate);
-            console.log('전송할 시작 날짜 (tm1):', apiStartDate);
-            console.log('전송할 종료 날짜 (tm2):', apiEndDate);
-            console.log('============================================');
+            // console.log('============================================');
+            // console.log('📤 API 요청 파라미터:');
+            // console.log('============================================');
+            // console.log('선택한 날짜:', targetDate);
+            // console.log('전송할 시작 날짜 (tm1):', apiStartDate);
+            // console.log('전송할 종료 날짜 (tm2):', apiEndDate);
+            // console.log('============================================');
             
             // API 호출
             const response = await fetch('/api/fetch-weather', {
@@ -116,17 +116,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!response.ok) {
                 // 디버그 정보가 있으면 콘솔에 출력
-                if (data.debug) {
-                    console.log('============================================');
-                    console.log('🔍 디버깅 정보:');
-                    console.log('============================================');
-                    console.log('지점번호:', data.debug.station);
-                    console.log('조회 기간:', data.debug.period);
-                    console.log('원본 데이터 길이:', data.debug.rawDataLength);
-                    console.log('원본 데이터 미리보기:');
-                    console.log(data.debug.rawDataPreview);
-                    console.log('============================================');
-                }
+                // if (data.debug) {
+                //     console.log('============================================');
+                //     console.log('🔍 디버깅 정보:');
+                //     console.log('============================================');
+                //     console.log('지점번호:', data.debug.station);
+                //     console.log('조회 기간:', data.debug.period);
+                //     console.log('원본 데이터 길이:', data.debug.rawDataLength);
+                //     console.log('원본 데이터 미리보기:');
+                //     console.log(data.debug.rawDataPreview);
+                //     console.log('============================================');
+                // }
                 throw new Error(data.error || '데이터를 가져오는데 실패했습니다.');
             }
 
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             testResult.innerHTML = resultHTML;
 
-            console.log('테스트 결과:', data);
+            // console.log('테스트 결과:', data);
 
         } catch (error) {
             console.error('Error:', error);
@@ -249,10 +249,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             testResult.innerHTML = resultHTML;
 
-            console.log('============================================');
-            console.log('기상청 API 지점 정보:');
-            console.log(data.data);
-            console.log('============================================');
+            // console.log('============================================');
+            // console.log('기상청 API 지점 정보:');
+            // console.log(data.data);
+            // console.log('============================================');
 
         } catch (error) {
             console.error('Error:', error);
