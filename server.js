@@ -58,15 +58,26 @@ function parseKMAData(rawData) {
   return dataLines;
 }
 
-// 날짜 형식 변환 함수 (YYYYMMDDHHmm -> CSV용 형식)
+// 날짜 형식 변환 함수 (YYYYMMDDHHmm -> CSV용 한국식 형식)
+// 예: 202510260000 -> 2025. 10. 26 오전 12:00:00
 function formatDateTime(yyyymmddhhmi) {
   const year = yyyymmddhhmi.substring(0, 4);
   const month = yyyymmddhhmi.substring(4, 6);
   const day = yyyymmddhhmi.substring(6, 8);
-  const hour = yyyymmddhhmi.substring(8, 10);
+  const hour24 = parseInt(yyyymmddhhmi.substring(8, 10));
   const minute = yyyymmddhhmi.substring(10, 12);
   
-  return `${year}-${month}-${day} ${hour}:${minute}:00`;
+  // 오전/오후 결정
+  const period = hour24 < 12 ? '오전' : '오후';
+  
+  // 12시간 형식으로 변환
+  let hour12 = hour24 % 12;
+  if (hour12 === 0) hour12 = 12; // 0시와 12시를 12로 표시
+  
+  // 두 자리 숫자로 포맷팅
+  const hourStr = String(hour12).padStart(2, '0');
+  
+  return `${year}. ${month}. ${day} ${period} ${hourStr}:${minute}:00`;
 }
 
 // 15분 단위 데이터 필터링 함수 (00, 15, 30, 45분만 추출)
