@@ -13,97 +13,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// 기상청 AWS 매분 자료 API 데이터 파싱 함수
-// 헤더: YYMMDDHHMI STN WD1 WS1 WDS WSS WD10 WS10 TA RE RN-15m RN-60m RN-12H RN-DAY HM PA PS TD
-function parseKMAData(rawData) {
-  const lines = rawData.split('\n');
-  const dataLines = [];
-  let headerFound = false;
-  
-  for (let line of lines) {
-    // 데이터 라인 시작 찾기
-    if (line.includes('YYMMDDHHMI')) {
-      headerFound = true;
-      continue;
-    }
-    
-    // 실제 데이터 라인 파싱 (날짜로 시작하는 라인)
-    if (headerFound && line.match(/^\d{12}/)) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 18) {
-        dataLines.push({
-          datetime: parts[0],  // YYMMDDHHMI (KST)
-          stn: parts[1],       // 지점번호 (STN)
-          wd1: parts[2],       // 풍향1 (deg)
-          ws1: parts[3],       // 풍속1 (m/s)
-          wds: parts[4],       // 풍향평균 (deg)
-          wss: parts[5],       // 풍속평균 (m/s)
-          wd10: parts[6],      // 풍향10분 (deg)
-          ws10: parts[7],      // 풍속10분 (m/s)
-          ta: parts[8],        // 기온 (C) ✓
-          re: parts[9],        // 강수 유무
-          rn15m: parts[10],    // 15분 강수량 (mm)
-          rn60m: parts[11],    // 60분 강수량 (mm)
-          rn12h: parts[12],    // 12시간 강수량 (mm)
-          rnday: parts[13],    // 일 강수량 (mm)
-          hm: parts[14],       // 습도 (%) ✓
-          pa: parts[15],       // 현지기압 (hPa)
-          ps: parts[16],       // 해면기압 (hPa)
-          td: parts[17]        // 이슬점온도 (C)
-        });
-      }
-    }
-  }
-  
-  return dataLines;
-}
-
-// 날짜 형식 변환 함수 (YYYYMMDDHHmm -> CSV용 한국식 형식)
-// 예: 202510260000 -> 2025. 10. 26 오전 12:00:00
-function formatDateTime(yyyymmddhhmi) {
-  const year = yyyymmddhhmi.substring(0, 4);
-  const month = yyyymmddhhmi.substring(4, 6);
-  const day = yyyymmddhhmi.substring(6, 8);
-  const hour24 = parseInt(yyyymmddhhmi.substring(8, 10));
-  const minute = yyyymmddhhmi.substring(10, 12);
-  
-  // 오전/오후 결정
-  const period = hour24 < 12 ? '오전' : '오후';
-  
-  // 12시간 형식으로 변환
-  let hour12 = hour24 % 12;
-  if (hour12 === 0) hour12 = 12; // 0시와 12시를 12로 표시
-  
-  // 두 자리 숫자로 포맷팅
-  const hourStr = String(hour12).padStart(2, '0');
-  
-  return `${year}. ${month}. ${day} ${period} ${hourStr}:${minute}:00`;
-}
-
-// 15분 단위 데이터 필터링 함수 (00, 15, 30, 45분만 추출)
-function filter15MinuteData(data) {
-  return data.filter(item => {
-    const minute = item.datetime.substring(10, 12);
-    return minute === '00' || minute === '15' || minute === '30' || minute === '45';
-  });
-}
-
-// CSV 생성 함수
-function generateCSV(data, location) {
-  let csv = 'id,temperature,humidity,recorded_at,location\n';
-  
-  data.forEach((row, index) => {
-    const id = index + 1;
-    const temperature = row.ta === '-9.0' || row.ta === '-9' || row.ta === '-99.0' || row.ta === '-99' ? '' : row.ta;
-    const humidity = row.hm === '-9.0' || row.hm === '-9' || row.hm === '-99.0' || row.hm === '-99' ? '' : row.hm;
-    const recordedAt = formatDateTime(row.datetime);
-    
-    csv += `${id},${temperature},${humidity},${recordedAt},${location}\n`;
-  });
-  
-  return csv;
-}
-
 // 지점 목록 조회 엔드포인트
 app.get('/api/stations', async (req, res) => {
   try {
@@ -168,15 +77,10 @@ app.post('/api/test-station', async (req, res) => {
       timeout: 30000
     });
     
-    const parsedData = parseKMAData(response.data);
-    
     res.json({
       success: true,
       stationNumber: stationNumber,
-      dataCount: parsedData.length,
-      hasData: parsedData.length > 0,
       rawDataLength: response.data.length,
-      sample: parsedData.length > 0 ? parsedData[0] : null,
       rawDataPreview: response.data.substring(0, 500)
     });
     
