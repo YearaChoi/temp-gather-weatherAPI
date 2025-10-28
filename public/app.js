@@ -52,6 +52,82 @@ document.addEventListener('DOMContentLoaded', function() {
         message.className = 'message';
     }
 
+    // 기상청 AWS 매분 자료 API 데이터 파싱 함수
+    function parseKMAData(rawData) {
+        const lines = rawData.split('\n');
+        const dataLines = [];
+        let headerFound = false;
+        
+        for (let line of lines) {
+            // 데이터 라인 시작 찾기
+            if (line.includes('YYMMDDHHMI')) {
+                headerFound = true;
+                continue;
+            }
+            
+            // 실제 데이터 라인 파싱 (날짜로 시작하는 라인)
+            if (headerFound && line.match(/^\d{12}/)) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 18) {
+                    dataLines.push({
+                        datetime: parts[0],  // YYMMDDHHMI (KST)
+                        stn: parts[1],       // 지점번호 (STN)
+                        ta: parts[8],        // 기온 (C) ✓
+                        hm: parts[14],       // 습도 (%) ✓
+                        td: parts[17]        // 이슬점온도 (C)
+                    });
+                }
+            }
+        }
+        
+        return dataLines;
+    }
+
+    // 15분 단위 데이터 필터링 함수
+    function filter15MinuteData(data) {
+        return data.filter(item => {
+            const minute = item.datetime.substring(10, 12);
+            return minute === '00' || minute === '15' || minute === '30' || minute === '45';
+        });
+    }
+
+    // 날짜 형식 변환 함수 (YYYYMMDDHHmm -> 한국식 형식)
+    function formatDateTime(yyyymmddhhmi) {
+        const year = yyyymmddhhmi.substring(0, 4);
+        const month = yyyymmddhhmi.substring(4, 6);
+        const day = yyyymmddhhmi.substring(6, 8);
+        const hour24 = parseInt(yyyymmddhhmi.substring(8, 10));
+        const minute = yyyymmddhhmi.substring(10, 12);
+        
+        // 오전/오후 결정
+        const period = hour24 < 12 ? '오전' : '오후';
+        
+        // 12시간 형식으로 변환
+        let hour12 = hour24 % 12;
+        if (hour12 === 0) hour12 = 12;
+        
+        // 두 자리 숫자로 포맷팅
+        const hourStr = String(hour12).padStart(2, '0');
+        
+        return `${year}. ${month}. ${day} ${period} ${hourStr}:${minute}:00`;
+    }
+
+    // CSV 생성 함수
+    function generateCSV(data, location) {
+        let csv = 'id,temperature,humidity,recorded_at,location\n';
+        
+        data.forEach((row, index) => {
+            const id = index + 1;
+            const temperature = row.ta === '-9.0' || row.ta === '-9' || row.ta === '-99.0' || row.ta === '-99' ? '' : row.ta;
+            const humidity = row.hm === '-9.0' || row.hm === '-9' || row.hm === '-99.0' || row.hm === '-99' ? '' : row.hm;
+            const recordedAt = formatDateTime(row.datetime);
+            
+            csv += `${id},${temperature},${humidity},${recordedAt},${location}\n`;
+        });
+        
+        return csv;
+    }
+
     // CSV 다운로드 함수
     function downloadCSV(csvContent, filename) {
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -115,32 +191,31 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             if (!response.ok) {
-                // 디버그 정보가 있으면 콘솔에 출력
-                // if (data.debug) {
-                //     console.log('============================================');
-                //     console.log('🔍 디버깅 정보:');
-                //     console.log('============================================');
-                //     console.log('지점번호:', data.debug.station);
-                //     console.log('조회 기간:', data.debug.period);
-                //     console.log('원본 데이터 길이:', data.debug.rawDataLength);
-                //     console.log('원본 데이터 미리보기:');
-                //     console.log(data.debug.rawDataPreview);
-                //     console.log('============================================');
-                // }
                 throw new Error(data.error || '데이터를 가져오는데 실패했습니다.');
             }
 
-            if (data.success && data.csv) {
+            if (data.success && data.rawData) {
+                // 클라이언트에서 데이터 처리
+                const parsedData = parseKMAData(data.rawData);
+                const filteredData = filter15MinuteData(parsedData);
+                
+                if (filteredData.length === 0) {
+                    throw new Error('해당 기간의 데이터가 없습니다.');
+                }
+                
+                // CSV 생성
+                const csv = generateCSV(filteredData, '서울시 금천구');
+                
                 // CSV 파일 다운로드
                 const filename = `weather_data_${targetDate}.csv`;
-                downloadCSV(data.csv, filename);
+                downloadCSV(csv, filename);
                 
                 showMessage(
-                    `✅ 성공! ${targetDate}의 ${data.dataCount}개 데이터를 다운로드했습니다.`,
+                    `✅ 성공! ${targetDate}의 ${filteredData.length}개 데이터를 다운로드했습니다.`,
                     'success'
                 );
             } else {
-                throw new Error('CSV 데이터를 생성하지 못했습니다.');
+                throw new Error('데이터를 받지 못했습니다.');
             }
 
         } catch (error) {

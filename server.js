@@ -120,18 +120,11 @@ app.get('/api/stations', async (req, res) => {
       authKey: KMA_API_KEY
     };
     
-    // console.log('============================================');
-    // console.log('기상청 AWS 매분 자료 지점 목록 조회 중...');
-    // console.log('============================================');
-    
     const response = await axios.get(url, { 
       params,
       timeout: 30000
     });
     
-    // console.log('응답 데이터:');
-    // console.log(response.data);
-    // console.log('============================================');
     
     res.json({
       success: true,
@@ -170,28 +163,12 @@ app.post('/api/test-station', async (req, res) => {
       authKey: KMA_API_KEY
     };
     
-    // console.log('============================================');
-    // console.log(`지점번호 ${stationNumber} AWS 매분 자료 테스트 중...`);
-    // console.log('============================================');
-    // console.log('파라미터:', params);
-    
     const response = await axios.get(url, { 
       params,
       timeout: 30000
     });
     
     const parsedData = parseKMAData(response.data);
-    
-    // console.log('응답 데이터 길이:', response.data.length);
-    // console.log('파싱된 데이터 개수:', parsedData.length);
-    
-    // if (parsedData.length > 0) {
-    //   console.log('✅ 데이터 있음 - 첫 번째 샘플:');
-    //   console.log(JSON.stringify(parsedData[0], null, 2));
-    // } else {
-    //   console.log('❌ 데이터 없음');
-    // }
-    // console.log('============================================');
     
     res.json({
       success: true,
@@ -212,7 +189,7 @@ app.post('/api/test-station', async (req, res) => {
   }
 });
 
-// API 엔드포인트 - AWS 매분 자료 (1분 단위 데이터)
+// API 엔드포인트 - 프록시 역할만 (원본 데이터 그대로 전달)
 app.post('/api/fetch-weather', async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
@@ -229,16 +206,7 @@ app.post('/api/fetch-weather', async (req, res) => {
     const stnNumber = '417';
     const url = 'https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-aws2_min';
     
-    // console.log('============================================');
-    // console.log('기상청 AWS 매분 자료 API 호출 시작');
-    // console.log('============================================');
-    // console.log('지점번호(stn):', stnNumber);
-    // console.log('시작일자(tm1):', startDate);
-    // console.log('종료일자(tm2):', endDate);
-    // console.log('API URL:', url);
-    // console.log('--------------------------------------------');
-    
-    // AWS 매분 자료 API는 tm1(시작시간)과 tm2(종료시간) 모두 사용
+    // AWS 매분 자료 API 파라미터
     const params = {
       tm1: startDate,
       tm2: endDate,
@@ -248,87 +216,19 @@ app.post('/api/fetch-weather', async (req, res) => {
       authKey: KMA_API_KEY
     };
     
-    // console.log('전체 파라미터:', params);
-    // console.log('--------------------------------------------');
-    
     const response = await axios.get(url, { 
       params,
       timeout: 30000
     });
     
-    // console.log('API 응답 상태:', response.status);
-    // console.log('응답 데이터 타입:', typeof response.data);
-    // console.log('응답 데이터 길이:', response.data ? response.data.length : 0);
-    // console.log('--------------------------------------------');
-    // console.log('원본 응답 데이터 (처음 1000자):');
-    // console.log(response.data ? response.data.substring(0, 1000) : 'No data');
-    // console.log('--------------------------------------------');
-    
     if (!response.data) {
-      // console.log('❌ 오류: API로부터 데이터를 받지 못했습니다.');
       return res.status(500).json({ error: 'API로부터 데이터를 받지 못했습니다.' });
     }
     
-    // 응답 데이터에 에러 메시지가 포함되어 있는지 확인
-    // if (response.data.includes('ERROR') || response.data.includes('error')) {
-    //   console.log('❌ API 응답에 에러 메시지 포함:');
-    //   console.log(response.data);
-    //   console.log('--------------------------------------------');
-    // }
-    
-    // 데이터 파싱
-    // console.log('데이터 파싱 시작...');
-    const parsedData = parseKMAData(response.data);
-    // console.log('파싱된 데이터 개수 (1분 단위):', parsedData.length);
-    
-    // 파싱된 원본 데이터의 첫/마지막 확인
-    // if (parsedData.length > 0) {
-    //   console.log('📊 파싱된 원본 데이터 (1분 단위):');
-    //   console.log('  첫 번째:', parsedData[0].datetime, '→', formatDateTime(parsedData[0].datetime));
-    //   console.log('  마지막:', parsedData[parsedData.length - 1].datetime, '→', formatDateTime(parsedData[parsedData.length - 1].datetime));
-    //   console.log('  첫 번째 샘플:', JSON.stringify(parsedData[0], null, 2));
-    // }
-    
-    // 15분 단위로 필터링 (00, 15, 30, 45분만)
-    const filteredData = filter15MinuteData(parsedData);
-    // console.log('필터링된 데이터 개수 (15분 단위):', filteredData.length);
-    
-    // if (filteredData.length > 0) {
-    //   console.log('✅ 15분 단위 첫 번째 데이터:');
-    //   console.log(JSON.stringify(filteredData[0], null, 2));
-    //   if (filteredData.length > 1) {
-    //     console.log('✅ 15분 단위 마지막 데이터:');
-    //     console.log(JSON.stringify(filteredData[filteredData.length - 1], null, 2));
-    //   }
-    // } else {
-    //   console.log('❌ 필터링된 데이터가 없습니다.');
-    //   console.log('원본 데이터 처음 5개:');
-    //   for (let i = 0; i < Math.min(5, parsedData.length); i++) {
-    //     console.log(`  ${i+1}:`, parsedData[i]);
-    //   }
-    // }
-    // console.log('============================================');
-    
-    if (filteredData.length === 0) {
-      return res.status(404).json({ 
-        error: '해당 기간의 데이터가 없습니다.',
-        debug: {
-          station: stnNumber,
-          period: `${startDate} ~ ${endDate}`,
-          rawDataLength: response.data.length,
-          parsedDataCount: parsedData.length,
-          rawDataPreview: response.data.substring(0, 500)
-        }
-      });
-    }
-    
-    // CSV 생성 (15분 단위 데이터만)
-    const csv = generateCSV(filteredData, '서울시 금천구');
-    
+    // 원본 데이터를 그대로 전달 (파싱, 필터링, CSV 생성은 클라이언트에서)
     res.json({
       success: true,
-      dataCount: filteredData.length,
-      csv: csv
+      rawData: response.data
     });
     
   } catch (error) {
